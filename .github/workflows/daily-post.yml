@@ -1,1 +1,43 @@
+name: Daily post
 
+on:
+  schedule:
+    # 08:15 UTC = 09:15 in the UK during summer, 08:15 in winter.
+    # GitHub's scheduler can run up to ~30 minutes late; that's normal.
+    - cron: "15 8 * * *"
+  workflow_dispatch: {}   # lets you trigger a post manually from the Actions tab
+
+permissions:
+  contents: write         # so the workflow can save queue progress back to the repo
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Post today's content
+        env:
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+          META_PAGE_ID: ${{ secrets.META_PAGE_ID }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+        run: python poster.py
+
+      - name: Save queue progress
+        if: always()      # record partial progress even if a platform failed
+        run: |
+          git config user.name "autoposter"
+          git config user.email "actions@users.noreply.github.com"
+          git add queue.csv
+          git diff --cached --quiet || git commit -m "Mark post as published"
+          git push
