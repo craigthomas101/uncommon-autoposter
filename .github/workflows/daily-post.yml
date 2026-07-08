@@ -2,7 +2,7 @@ name: Daily post
 
 on:
   schedule:
-    # 08:15 UTC = 09:15 in the UK during summer, 08:15 in winter.
+    # 10:15 UTC = 11:15 in the UK during summer, 10:15 in winter.
     # GitHub's scheduler can run up to ~30 minutes late; that's normal.
     - cron: "15 8 * * *"
   workflow_dispatch: {}   # lets you trigger a post manually from the Actions tab
