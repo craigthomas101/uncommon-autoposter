@@ -140,7 +140,8 @@ def post_bluesky(caption, image_data, alt_text, mime):
 
     r = requests.post(f"{BSKY}/com.atproto.server.createSession",
                       json={"identifier": handle, "password": password}, timeout=30)
-    r.raise_for_status()
+    if r.status_code >= 400:
+        raise RuntimeError(f"Bluesky login failed ({r.status_code}): {r.text[:200]}")
     session = r.json()
     auth = {"Authorization": f"Bearer {session['accessJwt']}"}
 
