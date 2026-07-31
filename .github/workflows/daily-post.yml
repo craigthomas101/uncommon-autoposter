@@ -4,7 +4,7 @@ on:
   schedule:
     # 14:00 UTC = 15:00 in the UK during summer, 14:00 in winter.
     # GitHub's scheduler can run up to ~30 minutes late; that's normal.
-    - cron: "15 8 * * *"
+    - cron: "0 14 * * *"
   workflow_dispatch: {}   # lets you trigger a post manually from the Actions tab
 
 permissions:
