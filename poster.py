@@ -44,7 +44,10 @@ BSKY = "https://bsky.social/xrpc"
 LINKEDIN_VERSION = "202506"
 BSKY_MAX_CHARS = 300
 BSKY_MAX_IMAGE_BYTES = 950_000
-URL_RE = re.compile(r"https?://[^\s)\]}>,]+")
+URL_RE = re.compile(
+    r"https?://[^\s)\]}>,]+"                                   # full URLs
+    r"|\b(?:www\.)?uncommonsense\.org\.uk(?:/[\w\-./]*)?"      # bare site links
+)
 
 
 # ---------------------------------------------------------------- helpers
@@ -140,8 +143,7 @@ def post_bluesky(caption, image_data, alt_text, mime):
 
     r = requests.post(f"{BSKY}/com.atproto.server.createSession",
                       json={"identifier": handle, "password": password}, timeout=30)
-    if r.status_code >= 400:
-        raise RuntimeError(f"Bluesky login failed ({r.status_code}): {r.text[:200]}")
+    r.raise_for_status()
     session = r.json()
     auth = {"Authorization": f"Bearer {session['accessJwt']}"}
 
@@ -159,9 +161,12 @@ def post_bluesky(caption, image_data, alt_text, mime):
     for m in URL_RE.finditer(text):
         start = len(text[:m.start()].encode("utf-8"))
         end = start + len(m.group().encode("utf-8"))
+        uri = m.group()
+        if not uri.startswith("http"):
+            uri = "https://" + uri.removeprefix("www.")
         facets.append({
             "index": {"byteStart": start, "byteEnd": end},
-            "features": [{"$type": "app.bsky.richtext.facet#link", "uri": m.group()}],
+            "features": [{"$type": "app.bsky.richtext.facet#link", "uri": uri}],
         })
 
     record = {
@@ -266,9 +271,19 @@ def post_linkedin(caption, image_data, mime):
 
 # ---------------------------------------------------------------- queue
 
+_queue_fields = list(FIELDS)  # actual columns found in the file (may include extras)
+
+
 def load_queue():
+    global _queue_fields
     with open(QUEUE_FILE, newline="", encoding="utf-8") as f:
-        rows = list(csv.DictReader(f))
+        reader = csv.DictReader(f)
+        rows = list(reader)
+        # preserve any extra columns (e.g. ig_caption) when saving
+        _queue_fields = list(reader.fieldnames or FIELDS)
+        for field in FIELDS:
+            if field not in _queue_fields:
+                _queue_fields.append(field)
     for row in rows:
         for field in FIELDS:
             row.setdefault(field, "")
@@ -278,9 +293,9 @@ def load_queue():
 
 def save_queue(rows):
     with open(QUEUE_FILE, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDS)
+        writer = csv.DictWriter(f, fieldnames=_queue_fields)
         writer.writeheader()
-        writer.writerows({k: row.get(k, "") for k in FIELDS} for row in rows)
+        writer.writerows({k: row.get(k, "") for k in _queue_fields} for row in rows)
 
 
 def validate(rows, configured):
